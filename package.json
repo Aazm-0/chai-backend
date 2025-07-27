@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev" : "nodemon src/index.gjs"
+    "dev": "nodemon src/index.gjs"
   },
   "keywords": [
     "javascript",
@@ -15,6 +15,7 @@
   "author": "Aazm",
   "license": "ISC",
   "devDependencies": {
-    "nodemon": "^3.1.10"
+    "nodemon": "^3.1.10",
+    "prettier": "^3.6.2"
   }
 }
