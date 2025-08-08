@@ -68,14 +68,14 @@ userSchema.pre("save", async function (next) {
 // The schema class has 4 main properties middlewares, instance methods, model methods and virtual
 // 1:instance method for checking password comaprison like isModified
 
-userSchema.methods.comparePassword(async function (password) {
+userSchema.methods.comparePassword = async function (password) {
     return await bcrypt.compare(password, this.password);
-})
+}
 
 // JWt is bearer token anyone who bears it can get access to protected routes 
 // Jwt library requries
 
-userSchema.methods.generateAccessToken(function () {
+userSchema.methods.generateAccessToken = function () {
     return jwt.sign({
         _id: this._id,
         email: this.email,
@@ -87,10 +87,10 @@ userSchema.methods.generateAccessToken(function () {
         {
             expiresIn: process.env.ACCESS_TOKEN_EXPIRY
         })
-})
+}
 
 // This will be used again so keep payload less
-userSchema.methods.generateRefreshToken(function () {
+userSchema.methods.generateRefreshToken = function () {
     return jwt.sign({
         _id: this._id,
     },
@@ -99,7 +99,7 @@ userSchema.methods.generateRefreshToken(function () {
         {
             expiresIn: process.env.REFRESH_TOKEN_EXPIRY
         })
-})
+}
 
 export const User = mongoose.model("User", userSchema)
 

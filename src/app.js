@@ -33,4 +33,14 @@ app.use(express.static("public"))
 // To securely access cookies of users browser from  the server you need cookieParser
 app.use(cookieParser())
 
+// We will bring routes here also the imports here reasioning
+// Visual clarity and some global middleware might be needed before the routes is imported
+import userRouter from "./routes/user.routes.js";
+
+//routes declaration
+// This is how you define an api with a version and named api now the Router api is gonna hit when 
+// https:localhost/8000/api/v1/users/ in here now you nest the route handlers 
+app.use("/api/v1/users",userRouter)
+
+
 export default app;
