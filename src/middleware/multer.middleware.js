@@ -3,7 +3,7 @@ import multer from "multer";
 // We are going to use disk storage instead of memory storage it is useful for handling bigger files too
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-      cb(null, '/public/temp')
+      cb(null, './public/temp')
     //   You can also handle errors here instead of null
     },
     filename: function (req, file, cb) {
