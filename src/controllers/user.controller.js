@@ -64,9 +64,9 @@ const registerUser = asyncHandler(async (req, res) => {
     // const coverImageLocalPath = req.files?.coverImage[0]?.path
     // WHen optionally chaining you can get errors like cannot read the properties of undefined
 
-    let coverImagePath
+    let coverImageLocalPath
     if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0) {
-        coverImage = req.files.coverImage[0].path
+        coverImageLocalPath = req.files.coverImage[0].path
     }
 
 
@@ -158,7 +158,7 @@ const loginUser = asyncHandler(async (req, res) => {
         .cookie("refreshToken", refreshToken, options)
         .json(
             new ApiResponse(
-                201,
+                200,
                 // Here you could send accessToken and refreshToken as an object too if user wants to save on local storage for mobile
                 // but less scure then 
                 updatedUser,
@@ -244,16 +244,142 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
                 "New Refresh Token Generated"
             ))
     } catch (error) {
-        throw new ApiError(401,error?.message || "Invalid refresh token ")
+        throw new ApiError(401, error?.message || "Invalid refresh token ")
     }
 
 })
 
+const changeCurrentPassword = asyncHandler(async (req, res) => {
+    const { oldPassword, newPassword } = req.files
+    // IF functionality like old password confirmold password then take it out from files
+    // then in an if bloc if(!(oldPassword === newPassword)) throw new ApiError() 
 
+    if (!oldPassword || !newPassword) {
+        throw new ApiError(400, "No fields should be empty")
+    }
+
+    const user = await User.findById(req.user?._id)
+    const isPasswordCorrect = await user.comparePassword(oldPassword)
+
+    if (!isPasswordCorrect) {
+        throw new ApiError(401, "Invalid old password")
+    }
+
+    user.password = newPassword
+
+    //  All the requirements such as requierd minlength if you want to bypass them then you need validate Before save
+    // The hooks still run tho
+    await user.save({ validateBeforeSave: false })
+
+    return res
+        .status(200)
+        .json(new ApiResponse(
+            200,
+            {},
+            "Password changed successfully"
+        ))
+})
+
+const getCurrentUser = asyncHandler(async (req, res) => {
+    // IF you have the jwt middleware then you can access the user
+    return res
+        .status(200)
+        .json(new ApiResponse(
+            200,
+            req.user,
+            "Successfully got the user"
+        ))
+})
+
+// You decide which properties you want to allow for change and which you dont want to allow
+const updateAccountDetails = asyncHandler(async (req, res) => {
+    const { email, fullName } = req.files
+    if (!fullName || !email) {
+        throw new ApiError(400, "All fields are required")
+    }
+
+    // mongodb operator to change specific field
+    const updatedUser = await User.findByIdAndUpdate(req.user?._id, {
+        $set: {
+            fullName,
+            email
+        }
+    }, { new: true })
+        .select("-password -refreshToken")
+
+    return res
+        .status(200)
+        .json(new ApiResponse(
+            200,
+            updatedUser,
+            "Successfully changed email and fullName"
+        ))
+})
+
+// Keep the file updates and details change seperate becauese if you do em all togethar it has load on server 
+// What order should be for middleware
+const updateAvatarImage = asyncHandler(async (req,res) => {
+    const avatarLocalPath = req.file?.path
+    if(!avatarLocalPath){
+        throw new ApiError(400,"Avatar file is missing")
+    }
+
+    const avatar = await uploadOnCloudinary(avatarLocalPath)
+    if(!avatar.url){
+        throw new ApiError(400,"Avatar from cloudinary is missing")
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(req.user?._id,{
+        $set: {
+            avatar : avatar.url
+        }
+    },{new : true})
+    .select("-password -refreshToken")
+
+    return res.
+    status(200)
+    .json(new ApiResponse(
+        200,
+        updatedUser,
+        "Avatar updated Succesfully"
+    ))
+})
+
+const updateUserCoverImage = asyncHandler(async (req,res) => {
+    const coverImageLocalPath = req.file?.path
+    if(!coverImageLocalPath){
+        throw new ApiError(400,"Cover file is missing")
+    }
+
+    const coverImage = await uploadOnCloudinary(coverImageLocalPath)
+    if(!coverImage.url){
+        throw new ApiError(400,"coverImage from cloudinary is missing")
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(req.user?._id,{
+        $set: {
+            coverImage : coverImage.url
+        }
+    },{new : true})
+    .select("-password -refreshToken")
+
+    return res.
+    status(200)
+    .json(new ApiResponse(
+        200,
+        updatedUser,
+        "Cover Image updated Succesfully"
+    ))
+})
 
 export {
     registerUser,
     loginUser,
     logoutUser,
-    refreshAccessToken
+    refreshAccessToken,
+    changeCurrentPassword,
+    getCurrentUser,
+    updateAccountDetails,
+    updateAvatarImage,
+    updateUserCoverImage
 }
