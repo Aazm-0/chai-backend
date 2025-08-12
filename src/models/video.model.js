@@ -39,6 +39,6 @@ const videoSchema = new Schema({
 
 // Schema has its own middlewares and hooks in the middlewares you can define your own logic but you can also define plugins
 videoSchema.plugin(mongooseAggregatePaginate)
-// Now mongodb has its own aggregattion middleware and operation but you need paginations and $limit,$skip and total docs
+// Now mongodb has its own aggregattion middleware and operation but you need paginations and $limit,$skip and total docs   
 
 export const Video = mongoose.model("Video", videoSchema)

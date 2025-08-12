@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { registerUser, loginUser, logoutUser, refreshAccessToken } from "../controllers/user.controller.js";
+import { registerUser, loginUser, logoutUser, refreshAccessToken, changeCurrentPassword, getCurrentUser, updateAccountDetails, updateAvatarImage, getChannelInformation, getVideoWatchHistory } from "../controllers/user.controller.js";
 import { upload } from "../middleware/multer.middleware.js";
 import { verifyJwt } from "../middleware/auth.middleware.js";
 
@@ -28,11 +28,18 @@ router.route("/register").post(
         }
     ]),
     registerUser)
-
 router.route("/login").post(loginUser)
 
 // Securred routes
-router.route("/logout").post(verifyJwt,logoutUser)
+router.route("/logout").post(verifyJwt, logoutUser)
 router.route("/refresh-token").post(refreshAccessToken)
+// You can clean all this up in prettier 
+router.route("/current-user").get(verifyJwt, getCurrentUser)
+router.route("/channel/:username").get(verifyJwt, getChannelInformation)
+router.route("/history").get(verifyJwt, getVideoWatchHistory)
+router.route("/update-account").patch(verifyJwt, updateAccountDetails)
+router.route("/change-password").patch(verifyJwt, changeCurrentPassword)
+router.route("/avatar").patch(verifyJwt, upload.single("avatar"), updateAvatarImage)
+router.route("/cover-image").patch(verifyJwt, upload.single("coverImage"), updateAvatarImage)
 
 export default router

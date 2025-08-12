@@ -4,6 +4,7 @@ import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinaryFileUpload.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 // helper method to generate both the tokens for a user 
 const generateRefreshTokenAndAccessToken = async (userId) => {
@@ -318,57 +319,199 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
 
 // Keep the file updates and details change seperate becauese if you do em all togethar it has load on server 
 // What order should be for middleware
-const updateAvatarImage = asyncHandler(async (req,res) => {
+const updateAvatarImage = asyncHandler(async (req, res) => {
     const avatarLocalPath = req.file?.path
-    if(!avatarLocalPath){
-        throw new ApiError(400,"Avatar file is missing")
+    if (!avatarLocalPath) {
+        throw new ApiError(400, "Avatar file is missing")
     }
 
     const avatar = await uploadOnCloudinary(avatarLocalPath)
-    if(!avatar.url){
-        throw new ApiError(400,"Avatar from cloudinary is missing")
+    if (!avatar.url) {
+        throw new ApiError(400, "Avatar from cloudinary is missing")
     }
 
-    const updatedUser = await User.findByIdAndUpdate(req.user?._id,{
+    const updatedUser = await User.findByIdAndUpdate(req.user?._id, {
         $set: {
-            avatar : avatar.url
+            avatar: avatar.url
         }
-    },{new : true})
-    .select("-password -refreshToken")
+    }, { new: true })
+        .select("-password -refreshToken")
 
     return res.
-    status(200)
-    .json(new ApiResponse(
-        200,
-        updatedUser,
-        "Avatar updated Succesfully"
-    ))
+        status(200)
+        .json(new ApiResponse(
+            200,
+            updatedUser,
+            "Avatar updated Succesfully"
+        ))
 })
 
-const updateUserCoverImage = asyncHandler(async (req,res) => {
+const updateUserCoverImage = asyncHandler(async (req, res) => {
     const coverImageLocalPath = req.file?.path
-    if(!coverImageLocalPath){
-        throw new ApiError(400,"Cover file is missing")
+    if (!coverImageLocalPath) {
+        throw new ApiError(400, "Cover file is missing")
     }
 
     const coverImage = await uploadOnCloudinary(coverImageLocalPath)
-    if(!coverImage.url){
-        throw new ApiError(400,"coverImage from cloudinary is missing")
+    if (!coverImage.url) {
+        throw new ApiError(400, "coverImage from cloudinary is missing")
     }
 
-    const updatedUser = await User.findByIdAndUpdate(req.user?._id,{
+    const updatedUser = await User.findByIdAndUpdate(req.user?._id, {
         $set: {
-            coverImage : coverImage.url
+            coverImage: coverImage.url
         }
-    },{new : true})
-    .select("-password -refreshToken")
+    }, { new: true })
+        .select("-password -refreshToken")
 
     return res.
-    status(200)
+        status(200)
+        .json(new ApiResponse(
+            200,
+            updatedUser,
+            "Cover Image updated Succesfully"
+        ))
+})
+
+const getChannelInformation = asyncHandler(async (req, res) => {
+    // Now first of all we will get the channel userName from the params 
+    const { userName } = req.params
+
+    if (!userName?.trim()) {
+        throw new ApiError(400, "Username is empty")
+    }
+
+    const channelInfo = await User.aggregate([
+        // Matching the channel which information we need from user
+        {
+            $match: {
+                userName: userName?.toLowerCase()
+            }
+        },
+        // getting the subscribers so basically we will get all the documents with the channel matching the user id 
+        // use look ups for joins 
+        {
+            $lookup: {
+                // mongodb changes name lower case plural
+                from: "subscriptions",
+                localField: "$._id",
+                foreignField: "$channel",
+                as: "subscribers"
+            }
+        },
+        // gets the field which has array of documents which mattch local with foreighn
+        {
+            $lookup: {
+                from: "subscriptions",
+                localField: "$._id",
+                foreignField: "$subscriber",
+                as:  "subscribedTo"
+            }
+        },
+        // adds additonal fields to the orignal document
+        {
+            $addFields:{
+                subscriberCount: {
+                    $size : "$subscribers"
+                },
+                channelsSubscribedToCount: {
+                    $size : "$subscribedTo"
+                },
+                isSubscribed: {
+                    $condition: {
+                        // based on condition returns specific values $in is used for checking arrays and project 
+                        // remember mongodb
+                        if: {$in  : [req.user?._id,"$subscribers.subscriber"]},
+                        then: true,
+                        else: false
+                    }
+                }
+            }
+        },
+        // project the fields we need has 1 and not is 0
+        {
+            $project: {
+                fullName: 1,
+                userName: 1,
+                subscriberCount: 1,
+                channelsSubscribedToCount: 1,
+                isSubscribed: 1,
+                avatar: 1,
+                coverImage: 1
+            }
+        }
+    ])
+
+    if(!channelInfo.length){
+        throw new ApiError(404,"Channel doesnt exist")
+    }
+
+    // the data type the aggregate returns is usually an array of objects with documents we have one so take out one
+
+    return res
+    .status(200)
     .json(new ApiResponse(
         200,
-        updatedUser,
-        "Cover Image updated Succesfully"
+        channelInfo[0],
+        "User Channel fetched successfull;y"
+    ))
+
+})
+
+const getVideoWatchHistory = asyncHandler(async (req,res) => {
+    // Remember the req.user that you get from mongoose methods is a string if you need touse it inside matching use it to make it an id first
+
+    const user = await User.aggregate([
+        {
+            $match: new mongoose.Types.ObjectId(req.user?._id)
+        },
+        {   
+            // joining the watchHistory or overriding the field by joining users with videos model
+            $lookup: {
+                from: "videos",
+                localField: "watchHistory",
+                foreignField: "_id",
+                // This probably overrides the old watch history
+                as: "watchHistory",
+                // subpipline to now make another join inside the field
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: "users",
+                            localField: "owner",
+                            foreignField: "_id",
+                            as: "owner",
+                            pipeline: [
+                                {
+                                    // another pipeline to project it
+                                    $project: {
+                                        userName: 1,
+                                        fullName: 1,
+                                        avatar: 1
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    // This is to change output which is in array to normal data form we need
+                    {
+                        $addFields: {
+                            owner: {
+                                $first: "$owner"
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    ])
+
+    return res
+    .status(200)
+    .json(new ApiResponse(
+        200,
+        user.watchHistory[0],
+        "Successfuly retrieved users watch History"
     ))
 })
 
@@ -378,8 +521,10 @@ export {
     logoutUser,
     refreshAccessToken,
     changeCurrentPassword,
-    getCurrentUser,
     updateAccountDetails,
     updateAvatarImage,
-    updateUserCoverImage
+    updateUserCoverImage,
+    getCurrentUser,
+    getChannelInformation,
+    getVideoWatchHistory
 }
